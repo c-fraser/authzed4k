@@ -5,14 +5,14 @@ import com.google.protobuf.gradle.id
 import com.google.protobuf.gradle.plugins
 import com.google.protobuf.gradle.protobuf
 import com.google.protobuf.gradle.protoc
+import java.net.URL
+import java.util.jar.Attributes
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
 import org.jetbrains.dokka.Platform
 import org.jetbrains.dokka.gradle.AbstractDokkaTask
 import org.jetbrains.dokka.gradle.DokkaTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jreleaser.model.Active
-import java.net.URL
-import java.util.jar.Attributes
 
 if (JavaVersion.current() < JavaVersion.VERSION_11)
     throw GradleException("Java 11+ is required for this project")

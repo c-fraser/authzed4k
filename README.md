@@ -1,2 +1,3 @@
 # authzed4k
-An authzed client library for Kotlin (JVM)
+
+An [Authzed](https://docs.authzed.com/) client library for Kotlin (JVM).
