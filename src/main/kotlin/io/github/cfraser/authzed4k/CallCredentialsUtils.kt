@@ -18,12 +18,23 @@ package io.github.cfraser.authzed4k
 import io.grpc.CallCredentials
 import io.grpc.Metadata
 import io.grpc.Status
+import io.grpc.stub.AbstractStub
 import java.util.concurrent.Executor
 
-/** A [CallCredentials] implementation using a *bearer token*. */
-class BearerToken(token: String) : CallCredentials() {
+/**
+ * Authorize requests from [T] with the [token].
+ *
+ * @param T the [AbstractStub] implementation
+ * @param token the token to use to authenticate
+ * @see [AbstractStub.withCallCredentials]
+ */
+fun <T : AbstractStub<T>> T.withToken(token: String): T =
+    withCallCredentials(BearerTokenCallCredentials(token))
 
-  private val bearerToken = "Bearer $token"
+/** A [CallCredentials] implementation including the *token* as the authorization metadata. */
+private class BearerTokenCallCredentials(token: String) : CallCredentials() {
+
+  private val authorization = "Bearer $token"
 
   override fun applyRequestMetadata(
       requestInfo: RequestInfo,
@@ -32,7 +43,10 @@ class BearerToken(token: String) : CallCredentials() {
   ) {
     executor.execute {
       try {
-        val metadata = Metadata().apply { put(METADATA_KEY, bearerToken) }
+        val metadata =
+            Metadata().apply {
+              put(Metadata.Key.of("authorization", Metadata.ASCII_STRING_MARSHALLER), authorization)
+            }
         applier.apply(metadata)
       } catch (throwable: Throwable) {
         applier.fail(Status.UNAUTHENTICATED.withCause(throwable))
@@ -41,10 +55,4 @@ class BearerToken(token: String) : CallCredentials() {
   }
 
   override fun thisUsesUnstableApi() {}
-
-  private companion object {
-
-    val METADATA_KEY: Metadata.Key<String> =
-        Metadata.Key.of("authorization", Metadata.ASCII_STRING_MARSHALLER)
-  }
 }

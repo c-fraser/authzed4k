@@ -1,3 +1,7 @@
+import com.bmuschko.gradle.docker.tasks.container.DockerCreateContainer
+import com.bmuschko.gradle.docker.tasks.container.DockerStartContainer
+import com.bmuschko.gradle.docker.tasks.container.DockerStopContainer
+import com.bmuschko.gradle.docker.tasks.image.DockerPullImage
 import com.diffplug.gradle.spotless.SpotlessExtension
 import com.google.protobuf.gradle.GenerateProtoTask
 import com.google.protobuf.gradle.generateProtoTasks
@@ -22,12 +26,14 @@ plugins {
   `java-library`
   `maven-publish`
   signing
+  idea
   id("org.jetbrains.dokka")
   id("com.google.protobuf")
   id("com.diffplug.spotless")
   id("io.github.gradle-nexus.publish-plugin")
   id("org.jreleaser")
   id("com.github.ben-manes.versions")
+  id("com.bmuschko.docker-remote-api")
 }
 
 repositories { mavenCentral() }
@@ -38,12 +44,24 @@ val grpcVersion: String by rootProject
 val bufDir = project.buildDir.resolve("buf")
 
 dependencies {
-  implementation(kotlin("stdlib"))
+  val annotationsApiVersion: String by rootProject
+  val kotlinxCoroutinesVersion: String by rootProject
+
+  compileOnly("org.apache.tomcat:annotations-api:$annotationsApiVersion")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
   implementation("com.google.protobuf:protobuf-kotlin:$protobufVersion")
   implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
   implementation("io.grpc:grpc-protobuf:$grpcVersion")
+  implementation("io.grpc:grpc-stub:$grpcVersion")
   protobuf(files(bufDir))
   runtimeOnly("io.grpc:grpc-netty-shaded:$grpcVersion")
+
+  val junitVersion: String by rootProject
+
+  testImplementation(kotlin("test"))
+  testImplementation(kotlin("test-junit5"))
+  testImplementation(platform("org.junit:junit-bom:$junitVersion"))
+  testImplementation("org.junit.jupiter:junit-jupiter")
 }
 
 java {
@@ -66,20 +84,15 @@ tasks {
   withType<KotlinCompile>().configureEach {
     kotlinOptions {
       jvmTarget = "${JavaVersion.VERSION_11}"
-      freeCompilerArgs = listOf("-Xjsr305=strict")
+      freeCompilerArgs = listOf("-Xjsr305=strict", "-Xopt-in=kotlin.RequiresOptIn")
     }
   }
-
-  withType<Test> { useJUnitPlatform() }
 
   withType<DokkaTask>().configureEach {
     dokkaSourceSets {
       named("main") {
         moduleName.set(project.name)
-        runCatching { project.file("MODULE.md").takeIf { it.exists() }!! }.onSuccess {
-            moduleDocumentation ->
-          includes.from(moduleDocumentation)
-        }
+        includes.from(project.file("MODULE.md"))
         platform.set(Platform.jvm)
         jdkVersion.set(JavaVersion.VERSION_11.ordinal)
         sourceLink {
@@ -105,6 +118,35 @@ tasks {
       }
 
   withType<GenerateProtoTask>() { dependsOn(exportBufs) }
+
+  val spicedbDocker: String by rootProject
+
+  val pullSpicedbImage by creating(DockerPullImage::class) { image.set(spicedbDocker) }
+
+  val createSpicedbContainer by
+      creating(DockerCreateContainer::class) {
+        dependsOn(pullSpicedbImage)
+        targetImageId(spicedbDocker)
+        entrypoint.set(listOf("spicedb", "serve-testing"))
+        val spicedbPort = 50051
+        exposePorts("TCP", listOf(spicedbPort))
+        hostConfig.portBindings.set(listOf("$spicedbPort:$spicedbPort"))
+      }
+
+  val startSpicedbContainer by
+      creating(DockerStartContainer::class) {
+        dependsOn(createSpicedbContainer)
+        targetContainerId(createSpicedbContainer.containerId)
+      }
+
+  val stopSpicedbContainer by
+      creating(DockerStopContainer::class) { targetContainerId(createSpicedbContainer.containerId) }
+
+  withType<Test> {
+    useJUnitPlatform()
+    dependsOn(startSpicedbContainer)
+    finalizedBy(stopSpicedbContainer)
+  }
 }
 
 protobuf {
