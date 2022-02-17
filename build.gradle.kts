@@ -112,7 +112,9 @@ tasks {
 
         doLast {
           arrayOf(authzedBuf, grpcGatewayBuf, protocGenValidateBuf).forEach { buf ->
-            exec { commandLine("buf", "export", "--exclude-imports", buf, "-o", bufDir) }
+            val pathArgs =
+                if (buf == authzedBuf) arrayOf("--path", "authzed/api/v1") else emptyArray()
+            exec { commandLine("buf", "export", "--exclude-imports", *pathArgs, "-o", bufDir, buf) }
           }
         }
       }
