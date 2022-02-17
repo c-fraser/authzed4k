@@ -44,15 +44,15 @@ val grpcVersion: String by rootProject
 val bufDir = project.buildDir.resolve("buf")
 
 dependencies {
-  val annotationsApiVersion: String by rootProject
   val kotlinxCoroutinesVersion: String by rootProject
+  val annotationsApiVersion: String by rootProject
 
+  api("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
+  api("com.google.protobuf:protobuf-kotlin:$protobufVersion")
+  api("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
+  api("io.grpc:grpc-protobuf:$grpcVersion")
+  api("io.grpc:grpc-stub:$grpcVersion")
   compileOnly("org.apache.tomcat:annotations-api:$annotationsApiVersion")
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
-  implementation("com.google.protobuf:protobuf-kotlin:$protobufVersion")
-  implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
-  implementation("io.grpc:grpc-protobuf:$grpcVersion")
-  implementation("io.grpc:grpc-stub:$grpcVersion")
   protobuf(files(bufDir))
   runtimeOnly("io.grpc:grpc-netty-shaded:$grpcVersion")
 
