@@ -6,6 +6,7 @@ import com.diffplug.gradle.spotless.SpotlessExtension
 import com.google.protobuf.gradle.GenerateProtoTask
 import com.google.protobuf.gradle.generateProtoTasks
 import com.google.protobuf.gradle.id
+import com.google.protobuf.gradle.ofSourceSet
 import com.google.protobuf.gradle.plugins
 import com.google.protobuf.gradle.protobuf
 import com.google.protobuf.gradle.protoc
@@ -50,11 +51,11 @@ dependencies {
   api("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
   api("com.google.protobuf:protobuf-kotlin:$protobufVersion")
   api("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
+  api("io.grpc:grpc-okhttp:$grpcVersion")
   api("io.grpc:grpc-protobuf:$grpcVersion")
   api("io.grpc:grpc-stub:$grpcVersion")
   compileOnly("org.apache.tomcat:annotations-api:$annotationsApiVersion")
   protobuf(files(bufDir))
-  runtimeOnly("io.grpc:grpc-netty-shaded:$grpcVersion")
 
   val junitVersion: String by rootProject
 
@@ -95,11 +96,16 @@ tasks {
         includes.from(project.file("MODULE.md"))
         platform.set(Platform.jvm)
         jdkVersion.set(JavaVersion.VERSION_11.ordinal)
+        noStdlibLink.set(false)
+        noJdkLink.set(false)
         sourceLink {
           localDirectory.set(project.file("src/main/kotlin"))
           remoteUrl.set(URL("https://github.com/c-fraser/authzed4k/tree/main/src/main/kotlin"))
           remoteLineSuffix.set("#L")
         }
+        externalDocumentationLink(url = URL("https://docs.authzed.com/reference/api"))
+        externalDocumentationLink(
+            url = URL("https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/"))
       }
     }
   }
@@ -166,7 +172,7 @@ protobuf {
     id("grpckt") { artifact = "io.grpc:protoc-gen-grpc-kotlin:$grpcKotlinVersion:jdk7@jar" }
   }
   generateProtoTasks {
-    all().forEach { task ->
+    ofSourceSet("main").forEach { task ->
       task.plugins {
         id("grpc")
         id("grpckt")
