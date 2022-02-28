@@ -27,7 +27,6 @@ plugins {
   `java-library`
   `maven-publish`
   signing
-  idea
   id("org.jetbrains.dokka")
   id("com.google.protobuf")
   id("com.diffplug.spotless")
@@ -103,12 +102,11 @@ tasks {
           remoteUrl.set(URL("https://github.com/c-fraser/authzed4k/tree/main/src/main/kotlin"))
           remoteLineSuffix.set("#L")
         }
-        externalDocumentationLink(url = URL("https://docs.authzed.com/reference/api"))
-        externalDocumentationLink(
-            url = URL("https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/"))
       }
     }
   }
+
+  withType<AbstractDokkaTask>() { dependsOn(assemble) }
 
   val exportBufs by
       creating(Task::class) {
@@ -125,7 +123,23 @@ tasks {
         }
       }
 
-  withType<GenerateProtoTask>() { dependsOn(exportBufs) }
+  val deleteGeneratedCode by creating {
+    doLast {
+      project.file("src").walkBottomUp().forEach { file ->
+        when {
+          file.isDirectory && file.listFiles().orEmpty().isEmpty() -> file.delete()
+          file.isFile &&
+              file.bufferedReader().useLines { lines ->
+                !lines.any { line ->
+                  line.contains("${(project.group as String).replace("-", "")}.${project.name}")
+                }
+              } -> file.delete()
+        }
+      }
+    }
+  }
+
+  withType<GenerateProtoTask>() { dependsOn(exportBufs, deleteGeneratedCode) }
 
   val spicedbDocker: String by rootProject
 
@@ -158,6 +172,7 @@ tasks {
 }
 
 protobuf {
+  generatedFilesBaseDir = "$projectDir/src"
   protoc { artifact = "com.google.protobuf:protoc:$protobufVersion" }
   plugins {
     id("grpc") {
@@ -174,8 +189,8 @@ protobuf {
   generateProtoTasks {
     ofSourceSet("main").forEach { task ->
       task.plugins {
-        id("grpc")
-        id("grpckt")
+        id("grpc") { outputSubDir = "java" }
+        id("grpckt") { outputSubDir = "kotlin" }
       }
       task.builtins { id("kotlin") }
     }
@@ -205,6 +220,7 @@ configure<SpotlessExtension> {
         limitations under the License.
         */
         """.trimIndent())
+    target(fileTree(project.rootDir) { include("src/*/kotlin/io/github/cfraser/authzed4k/*.kt") })
   }
 
   kotlinGradle { ktfmt(ktfmtVersion) }
